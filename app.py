@@ -11,8 +11,9 @@ Routes:
 
 import os
 import sys
+import hashlib
+from functools import lru_cache
 from pathlib import Path
-
 import io
 from flask import Flask, request, jsonify, send_from_directory, send_file, render_template_string
 from flask_cors import CORS
@@ -41,6 +42,18 @@ from src.AI.warp_blind import (
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
+
+# ── RENDER CACHE (in-memory LRU, max 50 entries) ─────────────────────
+# Sleutel: sha256(image_bytes[:1024] + config_str)
+# Waarde: base64 JPEG string van het render resultaat
+_render_cache: dict[str, str] = {}
+_RENDER_CACHE_MAX = 50
+
+def _cache_key(image_b64: str, config: dict, state: str, extra: dict) -> str:
+    # Gebruik eerste 1024 chars van image (uniek genoeg) + config json
+    config_str = str(sorted(config.items())) + str(sorted(extra.items())) + state
+    raw = (image_b64[:1024] + config_str).encode()
+    return hashlib.sha256(raw).hexdigest()[:16]
 
 
 # ── STATIC / INDEX ───────────────────────────────────────────────
@@ -118,6 +131,12 @@ def _do_render():
 
     mounting = (analysis.get("windowCheck") or {}).get("recommendation") or "in de dag"
 
+    # ── Cache check ──
+    ck = _cache_key(image_b64, config, state, extra)
+    if ck in _render_cache:
+        app.logger.info("[RENDER] Cache hit: %s", ck)
+        return jsonify({"image": _render_cache[ck]})
+
     try:
         image_url = generate_decor(
             image_b64=image_b64,
@@ -126,13 +145,19 @@ def _do_render():
             mounting=mounting,
             extra_options=extra,
         )
-        # ── Post-processing: watermark ──────────────────────────────────────
+        # ── Post-processing: watermark ─────────────────────────────────────
         try:
             rendered = b64_to_pil(image_url).convert("RGB")
             rendered = apply_watermark(rendered)
             image_url = pil_to_b64_jpeg(rendered, quality=92)
         except Exception as wm_exc:
             app.logger.warning("Post-processing mislukt (non-critical): %s", type(wm_exc).__name__)
+
+        # ── Cache opslaan (LRU: verwijder oudste entry als vol) ──
+        if len(_render_cache) >= _RENDER_CACHE_MAX:
+            oldest = next(iter(_render_cache))
+            del _render_cache[oldest]
+        _render_cache[ck] = image_url
 
         return jsonify({"image": image_url})
 

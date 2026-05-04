@@ -139,9 +139,9 @@ function stopCarousel() {
 
 // ── PROGRESS BAR ───────────────────────────────────────────────
 
-// Time-based progress: de /analyze call duurt gemiddeld ~40-45 seconden.
-// De balk loopt in ~45s van 0% naar 95%, dan springt completeProgress naar 100%.
-const EXPECTED_ANALYSIS_MS = 45000;
+// Time-based progress: de /analyze call duurt gemiddeld ~50-55 seconden.
+// De balk loopt in ~55s van 0% naar 95%, dan springt completeProgress naar 100%.
+const EXPECTED_ANALYSIS_MS = 55000;
 
 function startProgress() {
   const fill = document.getElementById('progress-fill');
@@ -168,14 +168,30 @@ function completeProgress() {
   fill.style.width = '100%';
 }
 
-// ── IMAGE UPLOAD ───────────────────────────────────────────────
+// ── IMAGE RESIZE (client-side, reduceert payload 60-80%) ──────
 
-function fileToBase64(file) {
+/**
+ * Resize afbeelding client-side naar max 1280px aan de langste zijde.
+ * Teruggeven als base64 JPEG (quality 88) — zelfde formaat als FileReader.
+ */
+async function resizeImage(file, maxSide = 1280, quality = 0.88) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width: w, height: h } = img;
+      if (w > maxSide || h > maxSide) {
+        if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
+        else       { w = Math.round(w * maxSide / h); h = maxSide; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
   });
 }
 
@@ -189,7 +205,8 @@ async function handleFile(file) {
     return;
   }
 
-  const base64 = await fileToBase64(file);
+  // Resize client-side vóór upload (reduceert payload 60-80%)
+  const base64 = await resizeImage(file);
   APP.uploadedImageBase64 = base64;
 
   showPage('loading');
@@ -393,7 +410,15 @@ function renderSuggestions(suggestions) {
   });
 }
 
+// Debounce: max 1 preview-request per 600ms — voorkomt rapid-fire bij kleurklikken
+let _previewDebounceTimer = null;
+function schedulePreview() {
+  clearTimeout(_previewDebounceTimer);
+  _previewDebounceTimer = setTimeout(() => generatePreview(), 600);
+}
+
 function selectColor(color) {
+
   APP.selectedColor = color;
   const heroImg = document.getElementById('color-hero-img');
   const imgSrc = color.textureUrl || color.sampleUrl || '';
@@ -406,7 +431,7 @@ function selectColor(color) {
   const isProductPhoto = /JALOEZIE.*\.(jpe?g)$/i.test(imgSrc);
   heroImg.classList.toggle('hero-img--product', isProductPhoto);
 
-  generatePreview();
+  schedulePreview();
 }
 
 function findCatalogColor(name, productType) {

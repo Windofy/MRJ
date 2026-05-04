@@ -9,7 +9,7 @@ echo  Sluit dit venster NIET.
 echo  ----------------------------------------
 echo.
 
-gcloud run deploy mrj415 --source "C:\Users\MNRV\Desktop\MRJ4.16" --project mrj415 --region europe-west1 --allow-unauthenticated --set-env-vars "ANTHROPIC_API_KEY=%ANTHROPIC_API_KEY%,GEMINI_API_KEY=%GEMINI_API_KEY%,FAL_KEY=%FAL_KEY%,SUPABASE_URL=%SUPABASE_URL%,SUPABASE_KEY=%SUPABASE_KEY%,FLASK_DEBUG=false" --verbosity=info 2>&1
+gcloud run deploy mrj415 --source "C:\Users\MNRV\Desktop\MRJ4.16" --project mrj415 --region europe-west1 --allow-unauthenticated --verbosity=info 2>&1
 
 echo.
 echo  ----------------------------------------

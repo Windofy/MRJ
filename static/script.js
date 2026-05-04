@@ -168,30 +168,14 @@ function completeProgress() {
   fill.style.width = '100%';
 }
 
-// ── IMAGE RESIZE (client-side, reduceert payload 60-80%) ──────
+// ── IMAGE UPLOAD ───────────────────────────────────────────────
 
-/**
- * Resize afbeelding client-side naar max 1280px aan de langste zijde.
- * Teruggeven als base64 JPEG (quality 88) — zelfde formaat als FileReader.
- */
-async function resizeImage(file, maxSide = 1280, quality = 0.88) {
+function fileToBase64(file) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width: w, height: h } = img;
-      if (w > maxSide || h > maxSide) {
-        if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
-        else       { w = Math.round(w * maxSide / h); h = maxSide; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = reject;
-    img.src = url;
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 
@@ -205,8 +189,7 @@ async function handleFile(file) {
     return;
   }
 
-  // Resize client-side vóór upload (reduceert payload 60-80%)
-  const base64 = await resizeImage(file);
+  const base64 = await fileToBase64(file);
   APP.uploadedImageBase64 = base64;
 
   showPage('loading');

@@ -215,18 +215,22 @@ def _render_alpha(img_bytes: bytes, mime: str, prompt: str) -> str:
     from google import genai
     from google.genai import types
 
-    model_id = os.getenv("RENDER_MODEL_ALPHA", "gemini-3-pro-image-preview")
+    model_id = os.getenv("RENDER_MODEL_ALPHA", "gemini-2.0-flash-preview-image-generation")
     api_key  = os.getenv("RENDER_KEY_ALPHA") or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("Primaire render key niet geconfigureerd.")
 
     client     = genai.Client(api_key=api_key)
     image_part = types.Part(inline_data=types.Blob(data=img_bytes, mime_type=mime))
+    text_part  = types.Part(text=prompt)
 
     response = client.models.generate_content(
         model=model_id,
-        contents=[image_part, prompt],
-        config=types.GenerateContentConfig(max_output_tokens=8192),
+        contents=[types.Content(role="user", parts=[image_part, text_part])],
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE", "TEXT"],
+            max_output_tokens=8192,
+        ),
     )
 
     candidates = getattr(response, "candidates", None) or []
@@ -258,19 +262,35 @@ def _render_beta(img_bytes: bytes, mime: str, prompt: str) -> str:
     b64str   = base64.b64encode(img_bytes).decode()
     data_url = f"data:{mime};base64,{b64str}"
 
+    # Sterke, zeer expliciete instructie voor BETA model
+    color_name = config.get("colorName", "white")
+    color_hex  = config.get("colorHex", "#FFFFFF")
+    slat_angle = extra_options.get("slatAngle", "Privacy")
+    slat_instruction = (
+        "slats tilted 10-15 degrees downward (privacy mode, diffuse light)"
+        if slat_angle == "Privacy"
+        else "slats fully closed flat (90 degrees, no light)"
+    )
+
     short_prompt = (
-        "Photorealistic interior room photo. Add venetian window blinds at the window. "
-        "Preserve all walls, floor, furniture, ceiling exactly as-is. "
-        "Only modify the window area to insert the blind. "
-        + prompt[:600]
+        f"This is a photorealistic interior room. "
+        f"ADD horizontal venetian blinds to ALL windows visible in the image. "
+        f"The blinds must FILL the ENTIRE window opening from top to bottom — no exposed glass. "
+        f"Blind color: {color_name} ({color_hex}). "
+        f"Slat angle: {slat_instruction}. "
+        f"The blinds must be clearly visible, prominent, and photorealistic. "
+        f"Do NOT change walls, floor, furniture, ceiling, or room colors. "
+        f"Only add the blind in the window opening. "
+        f"Result must look like a professional interior photography."
     )
 
     payload = json.dumps({
         "prompt":         short_prompt,
         "image_url":      data_url,
-        "guidance_scale": 3.5,
-        "num_steps":      28,
+        "guidance_scale": 7.5,
+        "num_steps":      35,
         "output_format":  "jpeg",
+        "strength":       0.75,
     }).encode("utf-8")
 
     req = urllib.request.Request(

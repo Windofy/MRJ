@@ -108,6 +108,22 @@ PRODUCT_MAP = {
         "reflects light, cool/sharp reflections."
     ),
 }
+SLAT_ANGLE_MAP = {
+    "Privacy": (
+        "SLAT TILT: **Privacy mode — 10-15 degrees downward**. "
+        "All slats tilted uniformly 10-15° downward (leading edge lower than trailing edge). "
+        "This creates diffuse light filtering — no direct sightline through the slats, "
+        "but warm ambient light passes through the gaps. Every slat is consistently angled. "
+        "The slat underside casts a thin soft shadow on the slat below."
+    ),
+    "Gesloten": (
+        "SLAT TILT: **Fully closed — 90 degrees (flat/horizontal)**. "
+        "All slats rotated completely flat, touching edge to edge. "
+        "Zero light transmission. The blind surface appears as a solid, uninterrupted plane. "
+        "Maximum privacy, complete light block."
+    ),
+}
+
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -137,13 +153,19 @@ def _optimize_image(image_b64: str, max_side: int = 1536, quality: int = 85) -> 
 
 
 def _build_prompt(config: dict, state: str, mounting: Optional[str], extra_options: dict) -> str:
-    english_state    = STATE_MAP.get(state, state)
+    # Blind is ALWAYS fully lowered — 'state' param is deprecated but kept for API compat
+    english_state    = (
+        "FULLY LOWERED — the blind covers the entire window from top rail to windowsill. "
+        "There is NO exposed glass below the blind. The bottom rail rests at sill level."
+    )
     english_mounting = MOUNTING_MAP.get(mounting or "in de dag", MOUNTING_MAP["in de dag"])
     english_product  = PRODUCT_MAP.get(config.get("productType", ""), "Horizontal Venetian Blinds")
     english_lighting = LIGHTING_MAP.get(
-        extra_options.get("lighting", "Middag (Helder)"),
-        LIGHTING_MAP["Middag (Helder)"],
+        extra_options.get("lighting", "Zonsondergang (Warm)"),
+        LIGHTING_MAP["Zonsondergang (Warm)"],
     )
+    slat_angle_key = extra_options.get("slatAngle", "Privacy")
+    english_slat_angle = SLAT_ANGLE_MAP.get(slat_angle_key, SLAT_ANGLE_MAP["Privacy"])
     tape_desc = (
         "with wide decorative fabric ladder tapes (vertical fabric strips)"
         if extra_options.get("ladderTape")
@@ -172,14 +194,15 @@ def _build_prompt(config: dict, state: str, mounting: Optional[str], extra_optio
       - Material Look: {config.get("material", "")}
       - Color: {config.get("colorName", "")} (Hex: {config.get("colorHex", "")})
       - Configuration: {slat_desc}, {tape_desc}
-      - State: {english_state}
+      - Blind Position: {english_state}
+      - {english_slat_angle}
 
       **STEP 3: MOUNTING GEOMETRY (CRITICAL)**
       {english_mounting}
 
       **STEP 4: LIGHTING PHYSICS & ATMOSPHERE**
       - **CONDITION**: {english_lighting}
-      - **RAYTRACING**: Render realistic slat shadows on the floor/furniture.
+      - **RAYTRACING**: Render realistic slat shadows on the floor/furniture consistent with the slat tilt angle.
       - **REFLECTIONS**: If Aluminium, show subtle room reflections on the slats. If Wood, show texture.
       - **INTEGRATION**: The blind must match the room's perspective vanishing point perfectly.
     """.strip()

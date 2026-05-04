@@ -242,13 +242,15 @@ async function renderVisualization() {
   };
 
   const extraOptions = {
-    lighting:   getSelected('rg-dagdeel'),
+    lighting:   getSelected('rg-dagdeel') || 'Zonsondergang (Warm)',
     ladderTape: getSelected('rg-ladder') === 'Ladderband',
     slatWidth:  getSelected('rg-lamel'),
+    slatAngle:  getSelected('rg-kantel') || 'Privacy',
   };
 
   const mounting = APP.analysisResult?.windowCheck?.recommendation || 'in de dag';
-  const state    = getSelected('rg-kantel') === 'Half open' ? 'Tot de helft' : 'Geheel uitgerold';
+  // Jaloezie altijd volledig neergelaten — kantelstand regelt alleen de lamelhoek
+  const state = 'Geheel uitgerold';
 
   try {
     const resp = await fetch('/render', {
@@ -612,13 +614,15 @@ async function generatePreview() {
   };
 
   const extraOptions = {
-    lighting:   getSelected('rg-dagdeel'),
+    lighting:   getSelected('rg-dagdeel') || 'Zonsondergang (Warm)',
     ladderTape: getSelected('rg-ladder') === 'Ladderband',
     slatWidth:  getSelected('rg-lamel'),
+    slatAngle:  getSelected('rg-kantel') || 'Privacy',
   };
 
   const mounting = APP.analysisResult?.windowCheck?.recommendation || 'in de dag';
-  const state    = getSelected('rg-kantel') === 'Half open' ? 'Tot de helft' : 'Geheel uitgerold';
+  // Jaloezie altijd volledig neergelaten — kantelstand regelt alleen de lamelhoek
+  const state = 'Geheel uitgerold';
 
   try {
     const resp = await fetch('/preview', {
